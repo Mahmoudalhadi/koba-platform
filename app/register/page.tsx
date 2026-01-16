@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import AuthLayout from "@/components/ui/AuthLayout";
 import AuthCard from "@/components/ui/AuthCard";
@@ -10,13 +10,26 @@ import PrimaryButton from "@/components/ui/PrimaryButton";
 import HelperLink from "@/components/ui/HelperLink";
 import Alert from "@/components/ui/Alert";
 
-export default function RegisterPage() {
+// Helper function to build redirect URL with validation
+function getRedirectUrl(redirectPath: string | null): string {
+  const baseUrl = "https://kobaplc.com";
+  
+  // Validate redirect path: must start with "/" and be a relative path
+  if (redirectPath && redirectPath.startsWith("/") && !redirectPath.includes("://")) {
+    return `${baseUrl}${redirectPath}`;
+  }
+  
+  // Default to base URL
+  return baseUrl;
+}
+
+function RegisterForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
+  const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
@@ -26,9 +39,16 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(null);
 
+    // Get redirect path from query params, default to "/"
+    const redirectPath = searchParams.get("redirect") || "/";
+    const redirectTo = getRedirectUrl(redirectPath);
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: redirectTo,
+      },
     });
 
     setLoading(false);
@@ -39,8 +59,8 @@ export default function RegisterPage() {
     }
 
     if (data?.session) {
-      // Session returned, redirect to home
-      router.push("/");
+      // Session returned, redirect to main site (full URL required for cross-domain redirect)
+      window.location.href = redirectTo;
     } else {
       // Email confirmation enabled, show message
       setSuccess("Check your email to confirm your account.");
@@ -93,5 +113,20 @@ export default function RegisterPage() {
         </div>
       </AuthCard>
     </AuthLayout>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <AuthCard>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Account</h2>
+          <div className="text-center text-gray-600">Loading...</div>
+        </AuthCard>
+      </AuthLayout>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

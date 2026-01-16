@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseBrowser";
 import AuthLayout from "@/components/ui/AuthLayout";
 import AuthCard from "@/components/ui/AuthCard";
@@ -10,12 +10,25 @@ import PrimaryButton from "@/components/ui/PrimaryButton";
 import HelperLink from "@/components/ui/HelperLink";
 import Alert from "@/components/ui/Alert";
 
-export default function LoginPage() {
+// Helper function to build redirect URL with validation
+function getRedirectUrl(redirectPath: string | null): string {
+  const baseUrl = "https://kobaplc.com";
+  
+  // Validate redirect path: must start with "/" and be a relative path
+  if (redirectPath && redirectPath.startsWith("/") && !redirectPath.includes("://")) {
+    return `${baseUrl}${redirectPath}`;
+  }
+  
+  // Default to base URL
+  return baseUrl;
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const searchParams = useSearchParams();
   const router = useRouter();
   const supabase = createSupabaseBrowserClient();
 
@@ -23,6 +36,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // Get redirect path from query params, default to "/"
+    const redirectPath = searchParams.get("redirect") || "/";
+    const redirectTo = getRedirectUrl(redirectPath);
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -36,8 +53,8 @@ export default function LoginPage() {
       return;
     }
 
-    // success: go to home page
-    router.push("/");
+    // success: redirect to main site (full URL required for cross-domain redirect)
+    window.location.href = redirectTo;
   };
 
   return (
@@ -88,5 +105,20 @@ export default function LoginPage() {
         </div>
       </AuthCard>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <AuthLayout>
+        <AuthCard>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Login</h2>
+          <div className="text-center text-gray-600">Loading...</div>
+        </AuthCard>
+      </AuthLayout>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

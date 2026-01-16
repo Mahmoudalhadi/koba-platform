@@ -24,7 +24,7 @@ export default function ForgotPage() {
     setMsg(null);
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
+      redirectTo: "https://kobaplc.com/login",
     });
 
     setLoading(false);
